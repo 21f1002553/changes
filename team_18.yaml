@@ -1,0 +1,2041 @@
+openapi: 3.0.3
+info:
+  title: School HRM Solution
+  version: "1.0.0"
+  description: |
+    Design and build a **web-based Human Resource Management (HRM) System** tailored for schools and educational institutions.
+    The application must streamline staff hiring, management, evaluations, payroll processes, attendance tracking, and internal coordination among teachers, HR personnel, and administrators.
+    The system should include portals for different user roles — **Admin, HR Manager, Teacher, Finance Officer, and BDA** — each with authorized access and tailored functionality.
+    AI-based modules should be integrated to assist in **resume screening, job matching, automated candidate evaluation, and document summarization**.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+tags:
+  - name: Roles
+    description: Role management endpoints.
+  - name: Users
+    description: User management endpoints.
+  - name: Auth
+    description: Authentication endpoints.
+  - name: AI
+    description: GenAI-powered endpoints.
+  - name: Jobs
+    description: Job post and application endpoints.
+  - name: Expenses
+    description: Expense endpoints.
+  - name: Leave
+    description: Leave endpoints.
+  - name: EOD
+    description: End-of-day reporting.
+  - name: Notifications
+    description: Notification endpoints.
+  - name: Onboarding
+    description: Onboarding endpoints.
+  - name: Reporting
+    description: Reporting and analytics.
+  - name: Salary
+    description: Salary and payroll endpoints.
+  - name: Training
+    description: Training/course endpoints.
+
+paths:
+  # Roles
+  /api/roles/:
+    get:
+      tags: [Roles]
+      summary: List roles
+      responses:
+        '200':
+          description: Roles array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+    post:
+      tags: [Roles]
+      summary: Create a role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  /api/roles/{role_id}:
+    get:
+      tags: [Roles]
+      summary: Get role by id
+      parameters:
+        - name: role_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Role found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+
+  # Users
+  /api/users/:
+    get:
+      tags: [Users]
+      summary: List users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Users array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+    post:
+      tags: [Users]
+      summary: Create user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/users/{user_id}:
+    get:
+      tags: [Users]
+      summary: Get user by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      tags: [Users]
+      summary: Update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    delete:
+      tags: [Users]
+      summary: Delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+
+  # Auth
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/ai/performance_review:
+    post:
+      tags: [AI]
+      summary: Generate AI performance review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PerformanceReviewRequest'
+      responses:
+        '200':
+          description: Performance review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+
+  /api/ai/make_JD:
+    post:
+      tags: [AI]
+      summary: Make a job description
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                job_title:
+                  type: string
+              required:
+                - job_title
+      responses:
+        '200':
+          description: Job description generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_description:
+                    type: string
+
+  # Jobs
+  /api/jobs/:
+    get:
+      tags: [Jobs]
+      summary: List job posts
+      responses:
+        '200':
+          description: Job posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JobPost'
+    post:
+      tags: [Jobs]
+      summary: Create job post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateJobPostRequest'
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPost'
+
+  /api/jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPost'
+
+  # Expense examples (file upload kept compatible)
+  /api/expenses/submit:
+    post:
+      tags: [Expenses]
+      summary: Submit expense (multipart)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                category:
+                  type: string
+                amount:
+                  type: number
+                  format: float
+                description:
+                  type: string
+                expense_date:
+                  type: string
+                  format: date
+                receipt:
+                  type: string
+                  format: binary
+              required:
+                - user_id
+                - category
+                - amount
+                - description
+            encoding:
+              receipt:
+                contentType:
+                  - application/pdf
+                  - image/png
+                  - image/jpeg
+      responses:
+        '201':
+          description: Expense submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseReport'
+
+
+  ################################
+  # LEAVE
+  ################################
+  /api/leave/adjust:
+    post:
+      tags: [Leave]
+      summary: Adjust leave balance / create leave record
+      description: Adjust employee leave balances and create a LeaveRecord.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee_id:
+                  type: string
+                leave_type:
+                  type: string
+                days:
+                  type: number
+                date:
+                  type: string
+                  format: date
+                reason:
+                  type: string
+              required:
+                - employee_id
+                - leave_type
+                - days
+                - date
+            example:
+              employee_id: "user-uuid-2"
+              leave_type: "Sick"
+              days: 2
+              date: "2025-03-02"
+              reason: "Fever"
+      responses:
+        '200':
+          description: Leave adjusted and record created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/LeaveRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/history:
+    get:
+      tags: [Leave]
+      summary: Leave request history
+      description: Get leave history, optional filter by employee_id.
+      parameters:
+        - name: employee_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of LeaveRecord
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveRecord'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/balance/{employee_id}:
+    get:
+      tags: [Leave]
+      summary: Get leave balance
+      description: Return leave balance for an employee (creates default if missing).
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Leave balance object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveBalance'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/types:
+    get:
+      tags: [Leave]
+      summary: Get supported leave types
+      description: Return a list of supported leave types.
+      responses:
+        '200':
+          description: Leave types list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/request:
+    post:
+      tags: [Leave]
+      summary: Request leave
+      description: Submit a leave request (will be pending for approval).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee_id:
+                  type: string
+                leave_type:
+                  type: string
+                days:
+                  type: number
+                start_date:
+                  type: string
+                  format: date
+                reason:
+                  type: string
+              required:
+                - employee_id
+                - leave_type
+                - days
+                - start_date
+            example:
+              employee_id: "user-uuid-2"
+              leave_type: "Casual"
+              days: 1
+              start_date: "2025-03-10"
+              reason: "Personal"
+      responses:
+        '201':
+          description: Leave request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/LeaveRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/approve/{leave_id}:
+    put:
+      tags: [Leave]
+      summary: Approve leave
+      description: Approve a pending leave request.
+      parameters:
+        - name: leave_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approver_id:
+                  type: string
+                comments:
+                  type: string
+            example:
+              approver_id: "user-uuid-10"
+              comments: "Approved"
+      responses:
+        '200':
+          description: Leave approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/leave/reject/{leave_id}:
+    put:
+      tags: [Leave]
+      summary: Reject leave
+      description: Reject a pending leave request.
+      parameters:
+        - name: leave_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approver_id:
+                  type: string
+                reason:
+                  type: string
+              required:
+                - approver_id
+                - reason
+            example:
+              approver_id: "user-uuid-10"
+              reason: "Insufficient balance"
+      responses:
+        '200':
+          description: Leave rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  ################################
+  # EOD (End-Of-Day)
+  ################################
+  /api/eod/submit:
+    post:
+      tags: [EOD]
+      summary: Submit EOD report
+      description: Submit an End-Of-Day report with tasks and optional AI summary.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitEODRequest'
+            example:
+              employee_id: "user-uuid-2"
+              report_id: "report-uuid-1"
+              role: "teacher"
+              date: "2025-03-20"
+              time: "09:00"
+              data:
+                - title: "Fix bug #123"
+                  status: "done"
+      responses:
+        '201':
+          description: EOD submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EODReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/eod/submissions:
+    get:
+      tags: [EOD]
+      summary: List EOD submissions
+      description: List reports with optional filters (start_date, end_date, employee, role).
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: employee
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Paginated list of EODs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EODReport'
+                  pagination:
+                    type: object
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/eod/submissions/{id}:
+    get:
+      tags: [EOD]
+      summary: Get single EOD
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: EOD report object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EODReport'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      tags: [EOD]
+      summary: Update EOD
+      description: Update an existing EOD report.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEODRequest'
+      responses:
+        '200':
+          description: EOD updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EODReport'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [EOD]
+      summary: Delete EOD
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: EOD deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/eod/templates/{role}:
+    get:
+      tags: [EOD]
+      summary: Get EOD template by role
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template object
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  template:
+                    type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  ################################
+  # NOTIFICATIONS
+  ################################
+  /api/notifications/:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Array of Notification
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/notifications/sends:
+    post:
+      tags: [Notifications]
+      summary: Send a notification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNotificationRequest'
+      responses:
+        '201':
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/notifications/mark-read/{notification_id}:
+    post:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: notification_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/notifications/free-manager:
+    get:
+      tags: [Notifications]
+      summary: Get free managers
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Array of manager users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/notifications/notify-manager/{manager_id}:
+    post:
+      tags: [Notifications]
+      summary: Notify manager
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: manager_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                candidate_id:
+                  type: string
+                message:
+                  type: string
+              required:
+                - candidate_id
+                - message
+            example:
+              candidate_id: "candidate-uuid-1"
+              message: "Please interview candidate John Doe"
+      responses:
+        '201':
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  ################################
+  # ONBOARDING
+  ################################
+  /api/onboarding/documents/upload:
+    post:
+      tags: [Onboarding]
+      summary: Upload onboarding document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                employee_id:
+                  type: string
+                doc_type:
+                  type: string
+              required:
+                - file
+                - employee_id
+                - doc_type
+      responses:
+        '201':
+          description: Document uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnBoardingDocument'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/onboarding/documents/{employee_id}:
+    get:
+      tags: [Onboarding]
+      summary: Get onboarding documents for employee
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of onboarding documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OnBoardingDocument'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/onboarding/documents/{doc_id}/verify:
+    put:
+      tags: [Onboarding]
+      summary: Verify onboarding document
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: doc_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                verifier_id:
+                  type: string
+                verified:
+                  type: boolean
+              required:
+                - verifier_id
+                - verified
+            example:
+              verifier_id: "user-uuid-1"
+              verified: true
+      responses:
+        '200':
+          description: Document verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnBoardingDocument'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/onboarding/progress/{employee_id}:
+    get:
+      tags: [Onboarding]
+      summary: Get onboarding progress
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Onboarding progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  employee_id:
+                    type: string
+                  progress_percent:
+                    type: number
+                  doc_status:
+                    type: object
+                  form_status:
+                    type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/onboarding/offer-letter/generate:
+    post:
+      tags: [Onboarding]
+      summary: Generate offer letter
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hr_id:
+                  type: string
+                template_vars:
+                  type: object
+            example:
+              hr_id: "user-uuid-1"
+              template_vars:
+                employee_id: "user-uuid-2"
+                candidate_name: "John Doe"
+                job_title: "School Teacher"
+                salary: "5 LPA"
+      responses:
+        '201':
+          description: Offer letter generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OfferLetter'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/onboarding/forms/{form_type}:
+    get:
+      tags: [Onboarding]
+      summary: Get form schema / prefilled data
+      parameters:
+        - name: form_type
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: employee_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Form schema and prefilled data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  form:
+                    type: string
+                  schema:
+                    type: object
+                  prefilled:
+                    type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/onboarding/forms/submit:
+    post:
+      tags: [Onboarding]
+      summary: Submit onboarding form (JSON or multipart)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee_id:
+                  type: string
+                form_type:
+                  type: string
+                form_data:
+                  type: object
+            example:
+              employee_id: "user-uuid-2"
+              form_type: "tax_form"
+              form_data:
+                tax_number: "ABC123"
+      responses:
+        '201':
+          description: Form submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingForm'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  ################################
+  # REPORTING
+  ################################
+  /api/reports/dashboard:
+    get:
+      tags: [Reporting]
+      summary: Dashboard statistics
+      description: Aggregate counts and sums for EODs, applications, expenses and employees.
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date_range:
+                    type: object
+                  statistics:
+                    type: object
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/reports/eod-summary:
+    get:
+      tags: [Reporting]
+      summary: EOD summary
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: employee_id
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: EOD summary object
+          content:
+            application/json:
+              schema:
+                type: object
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/reports/generate:
+    post:
+      tags: [Reporting]
+      summary: Generate custom report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                report_type:
+                  type: string
+                date_range:
+                  type: object
+                  properties:
+                    start:
+                      type: string
+                      format: date
+                    end:
+                      type: string
+                filters:
+                  type: object
+                format:
+                  type: string
+                user_id:
+                  type: string
+              required:
+                - report_type
+            example:
+              report_type: "eod"
+              date_range:
+                start: "2025-03-01"
+                end: "2025-03-31"
+              filters:
+                role: "engineering"
+              format: "json"
+      responses:
+        '200':
+          description: Report generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report_id:
+                    type: string
+                  report_type:
+                    type: string
+                  generated_at:
+                    type: string
+                    format: date-time
+                  data:
+                    type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  ################################
+  # SALARY
+  ################################
+  /api/salary/calculate/{employee_id}:
+    get:
+      tags: [Salary]
+      summary: Calculate salary for employee
+      parameters:
+        - name: employee_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Salary calculation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/SalaryRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/salary/deduction:
+    post:
+      tags: [Salary]
+      summary: Apply deduction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee_id:
+                  type: string
+                amount:
+                  type: number
+                reason:
+                  type: string
+              required:
+                - employee_id
+                - amount
+            example:
+              employee_id: "user-uuid-2"
+              amount: 500.0
+              reason: "Late coming deduction"
+      responses:
+        '200':
+          description: Deduction applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/salary/payroll/{month}/{year}:
+    get:
+      tags: [Salary]
+      summary: Get payroll summary for month/year
+      parameters:
+        - name: month
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Payroll list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SalaryRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  ################################
+  # TRAINING
+  ################################
+  /api/training/modules:
+    get:
+      tags: [Training]
+      summary: List training modules
+      parameters:
+        - name: training_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Array of Course schemas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Course'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/training/modules/{module_id}:
+    get:
+      tags: [Training]
+      summary: Get module details
+      parameters:
+        - name: module_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: user_id
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/training/modules/{module_id}/progress:
+    put:
+      tags: [Training]
+      summary: Update module progress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+                progress:
+                  type: number
+              required:
+                - user_id
+                - progress
+            example:
+              user_id: "user-uuid-2"
+              progress: 75.0
+      responses:
+        '200':
+          description: Progress updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/training/modules/{module_id}/complete:
+    post:
+      tags: [Training]
+      summary: Mark module complete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: string
+              required:
+                - user_id
+            example:
+              user_id: "user-uuid-2"
+      responses:
+        '200':
+          description: Module marked complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # Core model schemas (cleaned, taken from your models.py)
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+          description: UUID
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      example:
+        id: "role-uuid-1"
+        name: "Admin"
+        description: "System administrator"
+        created_at: "2025-01-01T12:00:00Z"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role_id:
+          type: string
+        role_name:
+          type: string
+          nullable: true
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        email_notifications:
+          type: boolean
+        sms_notifications:
+          type: boolean
+      example:
+        id: "user-uuid-1"
+        name: "Alice Admin"
+        email: "alice@example.com"
+        role_id: "role-uuid-1"
+        role_name: "Admin"
+        status: "active"
+        created_at: "2025-01-01T12:00:00Z"
+        email_notifications: true
+        sms_notifications: true
+
+    CreateRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+        - name
+
+    CreateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role_id:
+          type: string
+        status:
+          type: string
+      required:
+        - name
+        - email
+        - role_id
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        role_id:
+          type: string
+        status:
+          type: string
+
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role_id:
+          type: string
+      required:
+        - name
+        - email
+        - password
+        - role_id
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    GenericMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      example:
+        message: "Operation successful"
+
+    JobPost:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        requirements:
+          type: string
+          nullable: true
+        posted_by_id:
+          type: string
+        posted_by_name:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+
+    CreateJobPostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        requirements:
+          type: string
+        posted_by_id:
+          type: string
+        status:
+          type: string
+      required:
+        - title
+        - posted_by_id
+
+    ExpenseReport:
+      type: object
+      properties:
+        id:
+          type: string
+        report_id:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+        total:
+          type: number
+          format: float
+        status:
+          type: string
+
+    PerformanceReviewRequest:
+      type: object
+      properties:
+        employee_id:
+          type: string
+        reviewer_id:
+          type: string
+        employee_review:
+          type: string
+        manager_review:
+          type: string
+      required:
+        - employee_id
+        - reviewer_id
+        - employee_review
+        - manager_review
+
+    PerformanceReview:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        reviewer_id:
+          type: string
+        type:
+          type: string
+        text:
+          type: string
+        rating:
+          type: number
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    LeaveBalance:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        sick_leave:
+          type: integer
+        casual_leave:
+          type: integer
+        lop_leave:
+          type: integer
+
+    LeaveRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        leave_type:
+          type: string
+        days:
+          type: number
+        date:
+          type: string
+          format: date
+        reason:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    EODReport:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        report_id:
+          type: string
+        role:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        tasks:
+          type: array
+          items:
+            type: object
+        ai_summary:
+          type: string
+
+    SubmitEODRequest:
+      type: object
+      properties:
+        employee_id:
+          type: string
+        report_id:
+          type: string
+        role:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+      required:
+        - employee_id
+        - report_id
+        - role
+        - date
+        - time
+        - data
+
+    UpdateEODRequest:
+      type: object
+      properties:
+        role:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        recipient_id:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    CreateNotificationRequest:
+      type: object
+      properties:
+        recipient_id:
+          type: string
+        message:
+          type: string
+      required:
+        - recipient_id
+        - message
+
+    OnBoardingDocument:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        uploaded_by:
+          type: string
+        doc_type:
+          type: string
+        filename:
+          type: string
+        file_path:
+          type: string
+        verified:
+          type: boolean
+        verified_by:
+          type: string
+        verified_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    OnboardingForm:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        form_type:
+          type: string
+        payload:
+          type: object
+        submitted_by:
+          type: string
+        submitted_at:
+          type: string
+          format: date-time
+
+    OfferLetter:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        filename:
+          type: string
+        file_path:
+          type: string
+        status:
+          type: string
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+        report_type:
+          type: string
+        user_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        data:
+          type: object
+
+    SalaryRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        employee_id:
+          type: string
+        month:
+          type: integer
+        year:
+          type: integer
+        basic_salary:
+          type: number
+        deduction:
+          type: number
+        net_salary:
+          type: number
+        generated_at:
+          type: string
+          format: date-time
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: string
+        training_id:
+          type: string
+        title:
+          type: string
+        content_url:
+          type: string
+        duration_mins:
+          type: integer
+
+  responses:
+    BadRequest:
+      description: Bad request - missing or invalid parameters
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              error:
+                type: string
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
