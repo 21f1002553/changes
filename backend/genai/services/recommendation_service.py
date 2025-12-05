@@ -29,9 +29,22 @@ class RecommendationService:
 
         # generate content
         try:
-            response=llm.generate_content(prompt)
-            if not response or not response.text:
-                raise ValueError("Empty response from LLM")
+            attempt = 0
+            max_attempts = 3
+            while True:
+                try:
+                    response = llm.generate_content(prompt)
+                    if not response or not response.text:
+                        raise ValueError("Empty response from LLM")
+                    break
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                        import time
+                        time.sleep(1 * (2 ** (attempt - 1)))
+                        continue
+                    raise
         except Exception as e:
             raise RuntimeError(f"Error generating course recommendations: {e}")
 
@@ -63,9 +76,22 @@ class InterviewService:
 
         # generate content
         try:
-            response=llm.generate_content(prompt)
-            if not response or not response.text:
-                raise ValueError("Empty response from LLM")
+            attempt = 0
+            max_attempts = 3
+            while True:
+                try:
+                    response = llm.generate_content(prompt)
+                    if not response or not response.text:
+                        raise ValueError("Empty response from LLM")
+                    break
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                        import time
+                        time.sleep(1 * (2 ** (attempt - 1)))
+                        continue
+                    raise
         except Exception as e:
             raise RuntimeError(f"Error generating mock interview: {e}")
         
@@ -94,9 +120,22 @@ class ProfileEnhancementService:
 
         # generate content
         try:
-            response=llm.generate_content(prompt)
-            if not response or not response.text:
-                raise ValueError("Empty response from LLM")
+            attempt = 0
+            max_attempts = 3
+            while True:
+                try:
+                    response = llm.generate_content(prompt)
+                    if not response or not response.text:
+                        raise ValueError("Empty response from LLM")
+                    break
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                        import time
+                        time.sleep(1 * (2 ** (attempt - 1)))
+                        continue
+                    raise
         except Exception as e:
             raise RuntimeError(f"Error generating profile enhancement: {e}")
 
@@ -159,11 +198,24 @@ class UpskillingPathService:
         # load gemini model
         llm=LLMModelFactory.get_model_provider(self.model_name).get_model()
 
-        # generate content
+        # generate content (with retry/backoff for transient rate limits)
         try:
-            response=llm.generate_content(prompt)
-            if not response or not response.text:
-                raise ValueError("Empty response from LLM")
+            attempt = 0
+            max_attempts = 3
+            while True:
+                try:
+                    response = llm.generate_content(prompt)
+                    if not response or not response.text:
+                        raise ValueError("Empty response from LLM")
+                    break
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                        import time
+                        time.sleep(1 * (2 ** (attempt - 1)))
+                        continue
+                    raise
         except Exception as e:
             raise RuntimeError(f"Error generating upskilling path: {e}")
 

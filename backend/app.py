@@ -143,6 +143,8 @@ def create_app():
         from routes.expense_routes import expense_bp
         from routes.ai_routes import ai_bp
         from routes.file_routes import file_bp
+        from routes.task_routes import task_bp
+
     
         app.register_blueprint(user_bp, url_prefix='/api/users')
         app.register_blueprint(role_bp, url_prefix='/api/roles')
@@ -165,7 +167,7 @@ def create_app():
         app.register_blueprint(leave_bp, url_prefix='/api/leave')
         app.register_blueprint(training_bp, url_prefix='/api/training')
         app.register_blueprint(file_bp, url_prefix='/api/files')
-    
+        app.register_blueprint(task_bp, url_prefix='/api/tasks')
     # Root routes
     @app.route('/')
     def hello():

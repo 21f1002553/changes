@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from models import User, LeaveBalance, LeaveRecord
 from datetime import datetime
@@ -233,6 +234,29 @@ def reject_leave(leave_id):
                 'status': leave.status
             }
         }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@leave_bp.route('/<leave_id>', methods=['DELETE'])
+@jwt_required()
+def delete_leave(leave_id):
+    try:
+        current_user_id = get_jwt_identity()
+        leave = LeaveRecord.query.get_or_404(leave_id)
+
+        # Only the owner can delete their leave record (and only if not approved)
+        if leave.employee_id != current_user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        if leave.status == 'Approved':
+            return jsonify({'error': 'Cannot delete an approved leave'}), 400
+
+        db.session.delete(leave)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Leave deleted successfully'}), 200
 
     except Exception as e:
         db.session.rollback()

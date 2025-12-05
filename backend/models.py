@@ -147,6 +147,7 @@ class Application(db.Model):
             'id': self.id,
             'candidate_id': self.candidate_id,
             'candidate_name': self.candidate.name if self.candidate else None,
+            'candidate_email': self.candidate.email if self.candidate else None,
             'job_id': self.job_id,
             'job_title': self.job.title if self.job else None,
             'resume_id': self.resume_id,
@@ -434,14 +435,18 @@ class OfferLetter(db.Model):
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     employee_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    job_id = db.Column(db.String(36), db.ForeignKey('job_posts.id'), nullable=True)
     created_by = db.Column(db.String(36), db.ForeignKey('users.id'))
     status = db.Column(db.String(50), default='draft')
+    acceptance_status = db.Column(db.String(50), default='pending')  # pending, accepted, rejected
     filename = db.Column(db.String(100), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    accepted_at = db.Column(db.DateTime, nullable=True)
     employee = db.relationship("User", foreign_keys=[employee_id], backref="offer_letters", lazy=True)
+    job = db.relationship("JobPost", backref="offer_letters", lazy=True)
     documents = db.relationship("OnBoardingDocument", backref="offer", lazy=True)
 
     def to_dict(self):
@@ -449,9 +454,14 @@ class OfferLetter(db.Model):
             'id': self.id,
             'employee_id': self.employee_id,
             'employee_name': self.employee.name if self.employee else None,
+            'job_id': self.job_id,
+            'job_title': self.job.title if self.job else None,
             'filename': self.filename,
             'file_path': self.file_path,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'status': self.status,
+            'acceptance_status': self.acceptance_status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'accepted_at': self.accepted_at.isoformat() if self.accepted_at else None
         }
     
 class OnboardingForm(db.Model):
@@ -531,6 +541,8 @@ class LeaveRecord(db.Model):
             'date': self.date.isoformat(),
             'reason': self.reason,
             'created_at': self.created_at.isoformat(),
+            'status': self.status,
+            'employee_name': self.employee.name if self.employee else None
         }
 
 # -----Salary Calculations------
@@ -790,3 +802,133 @@ class Scorecard(db.Model):
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'is_final': self.is_final
         }
+
+
+class AITestAssignment(db.Model):
+    __tablename__ = 'ai_test_assignments'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    candidate_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    job_id = db.Column(db.String(36), db.ForeignKey('job_posts.id'), nullable=False)
+    test_type = db.Column(db.String(50), nullable=False, default='ai_technical_test')
+    questions = db.Column(db.Text, nullable=False)  # JSON string
+    answers = db.Column(db.Text, nullable=True)  # JSON string - filled when candidate submits
+    duration_minutes = db.Column(db.Integer, nullable=False, default=60)
+    deadline = db.Column(db.DateTime, nullable=False)
+    instructions = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default='scheduled')  # scheduled, in_progress, submitted, assessed
+    created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    candidate = db.relationship('User', foreign_keys=[candidate_id], backref='ai_tests_taken')
+    job = db.relationship('JobPost', backref='ai_tests')
+    creator = db.relationship('User', foreign_keys=[created_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'candidate_id': self.candidate_id,
+            'job_id': self.job_id,
+            'job_title': self.job.title if self.job else None,
+            'test_type': self.test_type,
+            'questions': self.questions,
+            'answers': self.answers,
+            'duration_minutes': self.duration_minutes,
+            'deadline': self.deadline.isoformat() if self.deadline else None,
+            'instructions': self.instructions,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None
+        }
+
+class AITestAssessment(db.Model):
+    __tablename__ = 'ai_test_assessments'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    test_assignment_id = db.Column(db.String(36), db.ForeignKey('ai_test_assignments.id'), nullable=False)
+    candidate_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    score = db.Column(db.Integer, nullable=False)  # Overall score
+    feedback = db.Column(db.Text, nullable=True)
+    strengths = db.Column(db.Text, nullable=True)
+    weaknesses = db.Column(db.Text, nullable=True)
+    recommendation = db.Column(db.String(20), nullable=False)  # pass, fail, borderline
+    evaluated_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    evaluated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    test_assignment = db.relationship('AITestAssignment', backref='assessments', foreign_keys=[test_assignment_id])
+    candidate = db.relationship('User', foreign_keys=[candidate_id])
+    evaluator = db.relationship('User', foreign_keys=[evaluated_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'test_assignment_id': self.test_assignment_id,
+            'candidate_id': self.candidate_id,
+            'score': self.score,
+            'feedback': self.feedback,
+            'strengths': self.strengths,
+            'weaknesses': self.weaknesses,
+            'recommendation': self.recommendation,
+            'evaluated_by': self.evaluated_by,
+            'evaluated_at': self.evaluated_at.isoformat() if self.evaluated_at else None
+        }
+
+
+# Add to models.py
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    assigned_to_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    assigned_by_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False)
+    deadline = db.Column(db.DateTime, nullable=False)
+    priority = db.Column(db.String(20), default='medium')  # low, medium, high
+    status = db.Column(db.String(50), default='pending')  # pending, in_progress, completed, reviewed
+    
+    # Employee self-review
+    employee_review = db.Column(db.Text)
+    employee_reviewed_at = db.Column(db.DateTime)
+    
+    # Manager review
+    manager_review = db.Column(db.Text)
+    manager_reviewed_at = db.Column(db.DateTime)
+    
+    # AI-generated summary
+    ai_summary = db.Column(db.Text)
+    ai_summary_generated_at = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    assigned_to = db.relationship('User', foreign_keys=[assigned_to_id], backref='assigned_tasks', lazy=True)
+    assigned_by = db.relationship('User', foreign_keys=[assigned_by_id], backref='created_tasks', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'assigned_to_id': self.assigned_to_id,
+            'assigned_to_name': self.assigned_to.name if self.assigned_to else None,
+            'assigned_by_id': self.assigned_by_id,
+            'assigned_by_name': self.assigned_by.name if self.assigned_by else None,
+            'deadline': self.deadline.isoformat() if self.deadline else None,
+            'priority': self.priority,
+            'status': self.status,
+            'employee_review': self.employee_review,
+            'employee_reviewed_at': self.employee_reviewed_at.isoformat() if self.employee_reviewed_at else None,
+            'manager_review': self.manager_review,
+            'manager_reviewed_at': self.manager_reviewed_at.isoformat() if self.manager_reviewed_at else None,
+            'ai_summary': self.ai_summary,
+            'ai_summary_generated_at': self.ai_summary_generated_at.isoformat() if self.ai_summary_generated_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+        

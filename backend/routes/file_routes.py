@@ -186,10 +186,11 @@ def download_file(file_id):
         # Users can access their own files or public files
         # Admins can access all files
         is_admin = current_user.role and current_user.role.name == 'admin'
+        is_hr = current_user.role and current_user.role.name == 'hr'
         is_owner = file_record.uploaded_by_id == current_user_id
         is_public = file_record.is_public
         
-        if not (is_admin or is_owner or is_public):
+        if not (is_admin or is_owner or is_public or is_hr):
             return jsonify({'error': 'Access denied. You do not have permission to download this file'}), 403
         
         # Check if file exists on disk
@@ -298,11 +299,12 @@ def preview_file(file_id):
         file_record = File.query.get_or_404(file_id)
         
         # Check access permissions
-        is_admin = current_user.role and current_user.role.name == 'admin'
+        is_Admin = current_user.role and current_user.role.name == 'admin'
+        is_hr = current_user.role and current_user.role.name == 'hr'
         is_owner = file_record.uploaded_by_id == current_user_id
         is_public = file_record.is_public
         
-        if not (is_admin or is_owner or is_public):
+        if not (is_hr or is_owner or is_public):
             return jsonify({'error': 'Access denied. You do not have permission to preview this file'}), 403
         
         # Check if file exists on disk
@@ -437,11 +439,12 @@ def get_files():
 @jwt_required()
 def get_resume():
     try:
-      current_user_id=get_jwt_identity()
-      resume=Resume.query.filter_by(owner_id=current_user_id).first()
-      return jsonify(resume.to_dict()),200
+        current_user_id = get_jwt_identity()
+        # Return all resumes for the current user (previously returned only the first)
+        resumes = Resume.query.filter_by(owner_id=current_user_id).order_by(Resume.uploaded_at.desc()).all()
+        return jsonify([r.to_dict() for r in resumes]), 200
     except Exception as e:
-      return jsonify({'error':str(e)}),500
+        return jsonify({'error': str(e)}), 500
 
 
 # 6. GET SINGLE FILE INFO
@@ -476,7 +479,7 @@ def get_file_info(file_id):
         file_record = File.query.get_or_404(file_id)
         
         # Check access permissions
-        is_admin = current_user.role and current_user.role.name == 'admin'
+        is_admin = current_user.role and current_user.role.name == 'hr'
         is_owner = file_record.uploaded_by_id == current_user_id
         is_public = file_record.is_public
         
@@ -690,23 +693,42 @@ def upload_resume():
         )
         
         db.session.add(new_file)
-        db.session.flush()  # Get the file ID
+        db.session.flush()
         
         # Delete existing resume if any
-        from models import Resume
-        existing_resume = Resume.query.filter_by(owner_id=current_user_id).first()
-        if existing_resume:
-            # Delete old file if it exists
-            if existing_resume.owner_id == current_user_id:
-                old_file = File.query.get(existing_resume.owner_id)
-                if old_file and os.path.exists(old_file.file_path):
-                    os.remove(old_file.file_path)
-                if old_file:
-                    db.session.delete(old_file)
-            db.session.delete(existing_resume)
-        
-        # Create Resume record
-        resume = Resume(
+
+
+        # if existing_resume:
+        #     # --- FIX STARTS HERE ---
+        #     # 1. Clean up the OLD underlying file (Physical file + File DB Record)
+        #     # We don't delete the Resume record itself, just the old file associated with it
+        #     if existing_resume.file_id:
+        #         old_file = File.query.get(existing_resume.file_id)
+        #         if old_file:
+        #             # Remove from disk
+        #             if os.path.exists(old_file.file_path):
+        #                 try:
+        #                     os.remove(old_file.file_path)
+        #                 except OSError:
+        #                     pass # File might be already gone
+        #             # Remove file record from DB
+        #             db.session.delete(old_file)
+            
+        #     # 2. Update the EXISTING resume record with new file details
+        #     # This preserves the Resume ID, keeping the 'Application' foreign key valid
+        #     existing_resume.file_url = file_path
+        #     existing_resume.uploaded_at = datetime.utcnow()
+        #     existing_resume.filename = unique_filename
+        #     existing_resume.file_id = new_file.id
+        #     existing_resume.file_size = file_size
+        #     # Reset parsed data on new upload if desired
+        #     existing_resume.parsed_data = None 
+            
+        #     resume_record = existing_resume
+        #     # --- FIX ENDS HERE ---
+        # else:
+        #     # Create NEW Resume record if none exists
+        resume_record = Resume(
             owner_id=current_user_id,
             file_url=file_path,
             uploaded_at=datetime.utcnow(),
@@ -715,15 +737,15 @@ def upload_resume():
             file_id=new_file.id,
             file_size=file_size
         )
+        db.session.add(resume_record)
         
-        db.session.add(resume)
         db.session.commit()
         
         return jsonify({
             'success': True,
             'message': 'Resume uploaded successfully',
             'file': new_file.to_dict(),
-            'resume': resume.to_dict()
+            'resume': resume_record.to_dict()
         }), 201
     
     except Exception as e:
@@ -731,4 +753,52 @@ def upload_resume():
         # Clean up file if database insert fails
         if 'file_path' in locals() and os.path.exists(file_path):
             os.remove(file_path)
+        return jsonify({'error': str(e)}), 500
+
+
+# DOWNLOAD FILE
+@file_bp.route('/preview-offer-letter', methods=['GET'])
+@jwt_required()
+def download_offer_letter():
+    """
+    Download a file by file_path
+    ---
+    tags:
+      - Files
+    parameters:
+      - name: file_path
+        in: query
+        type: string
+        required: true
+        description: Path to the file to download
+    responses:
+      200:
+        description: File downloaded successfully
+      404:
+        description: File not found
+      500:
+        description: Server error
+    """
+    try:
+        file_path = request.args.get('file_path')
+        
+        if not file_path:
+            return jsonify({'error': 'file_path parameter is required'}), 400
+        
+        # Security: Ensure the file path is within allowed directories
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+        
+        # Get mime type
+        mime_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+        
+        # Send file
+        return send_file(
+            file_path,
+            mimetype=mime_type,
+            as_attachment=True,
+            download_name=os.path.basename(file_path)
+        )
+    
+    except Exception as e:
         return jsonify({'error': str(e)}), 500

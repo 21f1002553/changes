@@ -13,20 +13,21 @@ def get_users():
         current_user_id = get_jwt_identity()
         current_user = User.query.get_or_404(current_user_id)
         role = Role.query.filter_by(id=current_user.role_id).first()
-        if (current_user.role_id == role.id) & (role.name == "admin"):
-            users = User.query.all()
-        elif (current_user.role_id == role.id) and (role.name == "candidate"):
-            users = User.query.filter_by(id=current_user_id).first()
-            return jsonify(users.to_dict()), 200
-        elif (current_user.role_id == role.id) and (role.name == "manager"):
+        if (current_user.role_id == role.id) and (role.name == "candidate"):
             users = User.query.filter_by(id=current_user_id).first()
             return jsonify(users.to_dict()), 200
         elif (current_user.role_id == role.id) and (role.name == "hr"):
             users = User.query.filter_by(id=current_user_id).first()
             return jsonify(users.to_dict()), 200
+        elif (current_user.role_id == role.id) and (role.name == "bda"):
+            users = User.query.filter_by(id=current_user_id).first()
+            return jsonify(users.to_dict()), 200
+        elif (current_user.role_id == role.id) and (role.name == "ho"):
+            users = User.query.filter_by(id=current_user_id).first()
+            return jsonify(users.to_dict()), 200
+            
         else:
             return jsonify({'error': 'Unauthorized role'}), 403
-        return jsonify([user.to_dict() for user in users]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -146,6 +147,20 @@ def change_password(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@user_bp.route('/role/<string:role_name>', methods=['GET'])
+@jwt_required()
+def get_users_by_role_name(role_name):
+    try:
+        role = Role.query.filter_by(name=role_name).first()
+        if not role:
+            return jsonify({'error': 'Role not found'}), 404
+        users = User.query.filter_by(role_id=role.id).all()
+        return jsonify([user.to_dict() for user in users]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @user_bp.route('/roles', methods=['GET'])
 @jwt_required()

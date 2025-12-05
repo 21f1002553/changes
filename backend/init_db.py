@@ -27,12 +27,10 @@ def init_database():
         
         print("Creating basic roles...")
         roles_data = [
-        {'name': 'admin', 'description': 'System administrator with full access'},
-        {'name': 'manager', 'description': 'Manager with team oversight responsibilities'},
+        {'name': 'ho', 'description': 'HO (Head Office) staff'},
         {'name': 'bda', 'description': 'Business Development Associate'},
         {'name': 'hr', 'description': 'Human Resources personnel'},
-        {'name': 'candidate', 'description': 'Job candidate with limited access'},
-            {'name': 'Interviewer', 'description': 'Staff member who conducts interviews'}
+        {'name': 'candidate', 'description': 'Teacher applicant or candidate'},
     ]
         
         for role_data in roles_data:
@@ -41,15 +39,14 @@ def init_database():
         
         print("Creating default hiring pipeline stages...")
         pipeline_stages = [
-            {'name': 'Application Received', 'description': 'Initial application submission', 'order_index': 1},
-            {'name': 'Resume Screening', 'description': 'Initial resume review and screening', 'order_index': 2},
-            {'name': 'Phone Screen', 'description': 'Initial phone or video screening call', 'order_index': 3},
-            {'name': 'Technical Interview', 'description': 'Technical skills assessment', 'order_index': 4},
-            {'name': 'Behavioral Interview', 'description': 'Cultural fit and behavioral assessment', 'order_index': 5},
-            {'name': 'Final Interview', 'description': 'Final interview with hiring manager', 'order_index': 6},
-            {'name': 'Reference Check', 'description': 'Background and reference verification', 'order_index': 7},
-            {'name': 'Offer', 'description': 'Job offer extended', 'order_index': 8},
-            {'name': 'Hired', 'description': 'Candidate accepted offer and hired', 'order_index': 9}
+            {'name': 'Shortlisted', 'description': 'Initial resume review and screening', 'order_index': 1},
+            {'name': 'Technical Test', 'description': 'Technical skills assessment', 'order_index': 2},
+            {'name': 'Technical Interview', 'description': 'In-depth technical interview', 'order_index': 3},
+            {'name': 'Behavioral Interview', 'description': 'Behavioral and culture fit interview', 'order_index': 4},
+            {'name': 'Final Interview', 'description': 'Final interview with hiring manager', 'order_index': 5},
+            {'name': 'Onboarding', 'description': 'Candidate onboarding and orientation', 'order_index': 6},
+            {'name': 'Offer', 'description': 'Job offer extended', 'order_index': 5},
+            {'name': 'Hired', 'description': 'Candidate accepted offer and hired', 'order_index': 8}
         ]
         
         for stage_data in pipeline_stages:

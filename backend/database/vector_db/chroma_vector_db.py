@@ -167,13 +167,12 @@ class ChromaVectorDBService:
     ### add policy chunks - seperately not aligned with chatbot model
     def add_school_policy(self, path, school_id):
         
-        path=TextUtility.resolve_path(path)
-        ext = path.suffix.lower()
+        # path=TextUtility.resolve_path(path)
+        # ext = path.suffix.lower()
         
-        if ext == '.pdf':
-            text = TextUtility.extract_text_from_pdf(path)
-        elif ext == '.docx':
-            text = TextUtility.extract_text_from_docx(path)
+        
+        text = TextUtility.extract_text_from_pdf(path)
+ 
         
         docs = Document(page_content=text)
 

@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from models import InterviewerAssignment, Resume, User, Application, JobPost
 from genai.services.resume_service import ResumeService
@@ -495,6 +496,164 @@ def get_candidate_interviews(candidate_id):
                 'limit': limit,
                 'offset': offset,
                 'has_more': offset + limit < total_count
+            }
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@screening_bp.route('/resumes/<resume_id>', methods=['GET'])
+@jwt_required()
+def get_resume(resume_id):
+    """
+    Get resume details by ID (for HR to view candidate resumes)
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(current_user_id)
+        
+        # Check if user is HR
+        is_hr = current_user.role and current_user.role.name.lower() == 'hr'
+        is_admin = current_user.role and current_user.role.name.lower() == 'admin'
+        
+        if not (is_hr or is_admin):
+            return jsonify({'error': 'Access denied. Only HR can access candidate resumes'}), 403
+        
+        # Get resume
+        resume = Resume.query.get_or_404(resume_id)
+        
+        return jsonify(resume.to_dict()), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@screening_bp.route('/my-performance/technical-tests', methods=['GET'])
+@jwt_required()
+def get_my_technical_test_results():
+    """Get technical test results for the current candidate"""
+    try:
+        from models import AITestAssignment, AITestAssessment
+        
+        current_user_id = get_jwt_identity()
+        
+        # Get all technical tests for the candidate
+        test_assignments = AITestAssignment.query.filter_by(
+            candidate_id=current_user_id
+        ).order_by(AITestAssignment.created_at.desc()).all()
+        
+        results = []
+        for assignment in test_assignments:
+            test_data = assignment.to_dict()
+            
+            # Get job details
+            if assignment.job:
+                test_data['job_details'] = {
+                    'id': assignment.job.id,
+                    'title': assignment.job.title,
+                    'location': assignment.job.location
+                }
+            
+            # Get assessment/results if available
+            assessment = AITestAssessment.query.filter_by(
+                test_assignment_id=assignment.id
+            ).first()
+            
+            if assessment:
+                test_data['assessment'] = {
+                    'id': assessment.id,
+                    'score': assessment.score,
+                    'feedback': assessment.feedback,
+                    'strengths': assessment.strengths,
+                    'weaknesses': assessment.weaknesses,
+                    'recommendation': assessment.recommendation,
+                    'evaluated_at': assessment.evaluated_at.isoformat() if assessment.evaluated_at else None
+                }
+            
+            results.append(test_data)
+        
+        return jsonify({
+            'success': True,
+            'tests': results,
+            'total': len(results)
+        }), 200
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@screening_bp.route('/my-performance/interviews', methods=['GET'])
+@jwt_required()
+def get_my_interview_results():
+    """Get interview results for the current candidate with optional filtering by type"""
+    try:
+        from models import Scorecard
+        
+        current_user_id = get_jwt_identity()
+        interview_type = request.args.get('interview_type')  # technical, hr, behavioral, etc.
+        
+        # Build query for interview assignments
+        query = InterviewerAssignment.query.filter_by(
+            candidate_id=current_user_id
+        )
+        
+        # Filter by interview type if provided
+        if interview_type:
+            query = query.filter_by(interview_type=interview_type)
+        
+        # Order by scheduled time (most recent first)
+        query = query.order_by(InterviewerAssignment.scheduled_at.desc())
+        
+        interviews = query.all()
+        
+        results = []
+        for interview in interviews:
+            interview_data = interview.to_dict()
+            
+            # Add job details
+            if interview.job:
+                interview_data['job_details'] = {
+                    'id': interview.job.id,
+                    'title': interview.job.title,
+                    'location': interview.job.location,
+                    'school': interview.job.school
+                }
+            
+            # Add interviewer details
+            if interview.interviewer:
+                interview_data['interviewer_details'] = {
+                    'id': interview.interviewer.id,
+                    'name': interview.interviewer.name
+                }
+            
+            # Get scorecard if available
+            scorecard = Scorecard.query.filter_by(
+                interview_assignment_id=interview.id
+            ).first()
+            
+            if scorecard:
+                interview_data['scorecard'] = {
+                    'id': scorecard.id,
+                    'overall_score': scorecard.overall_score,
+                    'technical_score': scorecard.technical_score,
+                    'communication_score': scorecard.communication_score,
+                    'problem_solving_score': scorecard.problem_solving_score,
+                    'cultural_fit_score': scorecard.cultural_fit_score,
+                    'strengths': scorecard.strengths,
+                    'weaknesses': scorecard.weaknesses,
+                    'feedback_notes': scorecard.feedback_notes,
+                    'recommendation': scorecard.recommendation,
+                    'submitted_at': scorecard.submitted_at.isoformat() if scorecard.submitted_at else None
+                }
+            
+            results.append(interview_data)
+        
+        return jsonify({
+            'success': True,
+            'interviews': results,
+            'total': len(results),
+            'filter': {
+                'interview_type': interview_type
             }
         }), 200
     

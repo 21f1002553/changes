@@ -1,5 +1,5 @@
 from ..prompt import PromptManager
-from models import User, Role, Resume, JobPost, Application, PerformanceReview
+from models import User, Role, Resume, JobPost, Application, PerformanceReview, db
 from database.vector_db import chroma_db_service
 from ..llm_factory import LLMModelFactory
 from utils import TextUtility
@@ -71,17 +71,23 @@ class ResumeMatch:
         self.model_name = model_name
 
     # get score and key metrics
-    def resume_match(self, job_title , job_description, job_requirements):
+    def resume_match(self, job_title , job_description, job_requirements, job_id):
         # get all the resumes of candidates
-        resumes = (
-            Resume.query
+        resumes_with_applications = (
+            db.session.query(Resume, Application, User)
+            .join(Application, Resume.id == Application.resume_id)
             .join(User, Resume.owner_id == User.id)
             .join(Role, User.role_id == Role.id)
-            .filter(Role.name == 'Candidate')
+            .filter(
+                Role.name == 'candidate',
+                Application.job_id == job_id,
+                Application.status.in_(['applied', 'screening', 'shortlisted', 'submitted'])
+            )
             .all()
         )
+        chroma_db_service.clear_collection(collection_name='resume')
         # extract key details (skill,etc) from resume and parse it
-        for resume in resumes:
+        for resume, application, user in resumes_with_applications:
             
 
             if resume.file_url is not None and resume.file_url.endswith('.pdf'):
@@ -90,16 +96,35 @@ class ResumeMatch:
                 parsed_resume = TextUtility.remove_pii(parsed_resume)
                 prompt = PromptManager.get_structure_json_resume(parsed_resume)
                 llm = LLMModelFactory.get_model_provider(self.model_name).get_model()
-                response = llm.generate_content(prompt)
-                parsed_resume = TextUtility.remove_json_marker(response.text)
+                # call LLM with retry on transient failures (rate limit/resource exhausted)
+                attempt = 0
+                max_attempts = 3
+                while True:
+                    try:
+                        response = llm.generate_content(prompt)
+                        parsed_resume = TextUtility.remove_json_marker(response.text)
+                        break
+                    except Exception as e:
+                        attempt += 1
+                        msg = str(e).lower()
+                        if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                            import time
+                            time.sleep(1 * (2 ** (attempt - 1)))
+                            continue
+                        raise
                 parsed_resume = TextUtility.format_resume_text(parsed_resume)
                 # print(type(parsed_resume))
+                
                 chroma_db_service.add_resume(
                     resume_id = resume.id,
                     text = parsed_resume,
                     metadata={
                         "user_id": resume.owner_id,
-                        "resume_id": resume.id
+                        "resume_id": resume.id,
+                        "application_id": application.id,
+                        "candidate_name": user.name,
+                        "job_id": job_id,
+                        "application_status": application.status
                     }
                 )
                 print(parsed_resume)
@@ -109,8 +134,21 @@ class ResumeMatch:
                 parsed_resume = TextUtility.remove_pii(parsed_resume)
                 prompt = PromptManager.get_structure_json_resume(parsed_resume)
                 llm = LLMModelFactory.get_model_provider(self.model_name).get_model()
-                response = llm.generate_content(prompt)
-                parsed_resume = TextUtility.remove_json_marker(response.text)
+                attempt = 0
+                max_attempts = 3
+                while True:
+                    try:
+                        response = llm.generate_content(prompt)
+                        parsed_resume = TextUtility.remove_json_marker(response.text)
+                        break
+                    except Exception as e:
+                        attempt += 1
+                        msg = str(e).lower()
+                        if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                            import time
+                            time.sleep(1 * (2 ** (attempt - 1)))
+                            continue
+                        raise
                 parsed_resume = TextUtility.format_resume_text(parsed_resume)
                 # print(parsed_resume)
                 chroma_db_service.add_resume(
@@ -118,14 +156,18 @@ class ResumeMatch:
                     text = parsed_resume,
                     metadata={
                         "user_id": resume.owner_id,
-                        "resume_id": resume.id
+                        "resume_id": resume.id,
+                        "application_id": application.id,
+                        "candidate_name": user.name,
+                        "job_id": job_id,
+                        "application_status": application.status
                     }
                 )
                 print(parsed_resume)
 
         # search top-n resume based on jobs
         job_text = f"{job_title}\n{job_description}\n{job_requirements}"
-        resumes = chroma_db_service.search_resumes_for_job(job_text, k=5)
+        resumes = chroma_db_service.search_resumes_for_job(job_text, k=min(5, len(resumes_with_applications)))
         # print(resumes)
         sorted_resumes = sorted(resumes, key = lambda x: x['distance'])
         # print(sorted_resumes)
@@ -134,8 +176,21 @@ class ResumeMatch:
         # print(resume_text)
         prompt = PromptManager.resume_shortlisting_prompt(sorted_resumes[0], job_title, job_description, job_requirements)
         llm = LLMModelFactory.get_model_provider(self.model_name).get_model()
-        response = llm.generate_content(prompt)
-        result = TextUtility.remove_json_marker(response.text)
+        attempt = 0
+        max_attempts = 3
+        while True:
+            try:
+                response = llm.generate_content(prompt)
+                result = TextUtility.remove_json_marker(response.text)
+                break
+            except Exception as e:
+                attempt += 1
+                msg = str(e).lower()
+                if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                    import time
+                    time.sleep(1 * (2 ** (attempt - 1)))
+                    continue
+                raise
         print(result)
         # res={"resume_id":resume_text[0], **result}
         return result
@@ -158,10 +213,22 @@ class ParseResume:
             parsed_resume = TextUtility.remove_pii(parsed_resume)
             prompt = PromptManager.get_structure_json_resume(parsed_resume)
             llm = LLMModelFactory.get_model_provider('gemini').get_model()
-            response = llm.generate_content(prompt)
-            parsed_resume = TextUtility.remove_json_marker(response.text)
-            parsed_resume = TextUtility.format_resume_text(parsed_resume)
-            return parsed_resume
+            attempt = 0
+            max_attempts = 3
+            while True:
+                try:
+                    response = llm.generate_content(prompt)
+                    parsed_resume = TextUtility.remove_json_marker(response.text)
+                    parsed_resume = TextUtility.format_resume_text(parsed_resume)
+                    return parsed_resume
+                except Exception as e:
+                    attempt += 1
+                    msg = str(e).lower()
+                    if ("429" in msg or "resource exhausted" in msg or "rate limit" in msg) and attempt < max_attempts:
+                        import time
+                        time.sleep(1 * (2 ** (attempt - 1)))
+                        continue
+                    raise
         except Exception as e:
             raise RuntimeError(f"Error parsing resume: {e}")
             

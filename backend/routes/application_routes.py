@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import db
-from models import Application, User, JobPost, Resume, Vacancy
+from models import Application, User, JobPost, Resume, Vacancy, Role
 from datetime import datetime
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
@@ -106,7 +106,8 @@ def get_applications():
     try:
         # Get query parameters for filtering
         current_user_id = get_jwt_identity()
-        candidate_id = current_user_id
+        user = User.query.get(current_user_id)
+        role=Role.query.filter_by(id=user.role_id).first()
         job_id = request.args.get('job_id')
         status = request.args.get('status')
         limit = request.args.get('limit', 50, type=int)
@@ -115,8 +116,10 @@ def get_applications():
         # Build query with filters
         query = Application.query
         
-        if candidate_id:
-            query = query.filter(Application.candidate_id == candidate_id)
+        if user.role_id == role.id and role.name == 'candidate':
+            query = query.filter(Application.candidate_id == current_user_id)
+        if user.role_id == role.id and role.name in ['hr', 'admin']:
+            query = query.filter(Application.job_id == job_id)
         if job_id:
             query = query.filter(Application.job_id == job_id)
         if status:
@@ -267,7 +270,7 @@ def get_application_stats():
         
         # Get status counts
         status_counts = {}
-        statuses = ['applied', 'under_review', 'screening', 'interviewed', 'selected', 'rejected']
+        statuses = ['applied', 'under_review', 'shortlisted', 'interviewed', 'selected', 'rejected']
         
         for status in statuses:
             count = query.filter(Application.status == status).count()

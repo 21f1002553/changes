@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from models import (
-    User, Role, JobPost, Resume, Application, Interview,
+    AITestAssessment, AITestAssignment, User, Role, JobPost, Resume, Application, Interview,
     Training, Course, Enrollment, Report, EODReport, ExpenseReport,
     PerformanceReview, Notification, AuditLog
 )
@@ -18,6 +18,8 @@ from genai.schema.schema_manager import (
 )
 from utils.validation_json import validate_json, validate_uuid
 import json
+from datetime import datetime
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -198,14 +200,16 @@ def get_resume_score(job_post_id):
         A JSON object containing the resume score.
     """
     try:
+
         jobpost = JobPost.query.get_or_404(job_post_id)
         job_title = jobpost.title
         job_description = jobpost.description
         job_requirements = jobpost.requirements
 
+
         resume_match = ResumeMatch()
 
-        top_resume = resume_match.resume_match(job_title, job_description, job_requirements)
+        top_resume = resume_match.resume_match(job_title, job_description, job_requirements, job_post_id)
 
         if not top_resume:
             return jsonify({'error': 'Failed to get resume score'}), 500
@@ -252,8 +256,47 @@ def get_courses(resume_id):
 
 ### chatbot
 @ai_bp.route('/chatbot/<school_id>', methods=['POST'])
+@jwt_required()
 def chatbot(school_id):
-    pass
+    """
+    Chat with AI assistant about school policies.
+
+    Args:
+        school_id (str): The school ID.
+        question (str): The user's question.
+
+    Returns:
+        A JSON object containing the chatbot response.
+    """
+    try:
+        data = request.get_json()
+        question = data.get('question')
+        
+        if not question:
+            return jsonify({
+                'success': False,
+                'error': 'Question is required'
+            }), 400
+        
+        chatbot_service = ChatbotService()
+        answer = chatbot_service.chat(school_id, question)
+        
+        if not answer:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to generate response'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'answer': answer
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Error in chatbot: {str(e)}'
+        }), 500
 
 
 ### get job posts based on resume 
@@ -301,7 +344,227 @@ def get_upskilling_path(resume_id):
         if not output:
             return jsonify({'error': 'Failed to generate upskilling path'}), 500
         
+        print("######################")
+        print(output)
         return jsonify({'upskilling_path': output}), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+
+# Add these new routes to your existing ai_routes.py
+
+@ai_bp.route('/schedule-test', methods=['POST'])
+def schedule_test():
+    """Schedule an AI test for a candidate"""
+    try:
+        data = request.get_json()
+        
+        test_assignment = AITestAssignment(
+            candidate_id=data['candidate_id'],
+            job_id=data['job_id'],
+            test_type=data['test_type'],
+            questions=data['questions'],
+            duration_minutes=data['duration_minutes'],
+            deadline=datetime.fromisoformat(data['deadline']),
+            instructions=data.get('instructions', ''),
+            status='scheduled',
+            created_by=data.get('created_by')
+        )
+        
+        db.session.add(test_assignment)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Test scheduled successfully',
+            'test_id': test_assignment.id
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@ai_bp.route('/test/<test_id>', methods=['GET'])
+@jwt_required()
+def get_test_by_id(test_id):
+    """Get test details for taking the test"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        test = AITestAssignment.query.get_or_404(test_id)
+        
+        # Verify this test belongs to the current user
+        if test.candidate_id != current_user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        return jsonify(test.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+@ai_bp.route('/test-results/<test_id>', methods=['GET'])
+@jwt_required()
+def get_test_results(test_id):
+    """Get test results for evaluation"""
+    try:
+        test = AITestAssignment.query.get_or_404(test_id)
+        
+        # Only managers and hr can view results
+        current_user_id = get_jwt_identity()
+        current_user = User.query.get_or_404(current_user_id)
+        role = Role.query.filter_by(id=current_user.role_id).first()
+        if (current_user.role_id == role.id) and (role.name not in ['manager', 'hr']):
+            return jsonify({'error': 'Unauthorized role'}), 403
+        
+        if not test:
+            return jsonify({'error': 'Test not found'}), 404
+        
+        if test.status != 'submitted':
+            return jsonify({'error': 'Test not submitted yet'}), 400
+        
+        if not test.answers:
+            return jsonify({'error': 'Test answers not found'}), 404
+            
+        return jsonify(test.to_dict()), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@ai_bp.route('/submit-test/<test_id>', methods=['POST'])
+@jwt_required()
+def submit_test(test_id):
+    """Candidate submits test answers"""
+    try:
+        data = request.get_json()
+        
+        test = AITestAssignment.query.get_or_404(test_id)
+        test.answers = json.dumps(data['answers'])
+        test.submitted_at = datetime.utcnow()
+        test.status = 'submitted'
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Test submitted successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@ai_bp.route('/pending-assessments', methods=['GET'])
+@jwt_required()
+def get_pending_assessments():
+    """Get tests pending manager review"""
+    try:
+        pending_tests = AITestAssignment.query.filter_by(status='submitted').all()
+        
+        return jsonify({
+            'pending_tests': [test.to_dict() for test in pending_tests]
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@ai_bp.route('/submit-assessment', methods=['POST'])
+@jwt_required()
+def submit_assessment():
+    """Submit test assessment by manager"""
+    try:
+        data = request.get_json()
+        
+        # Create assessment record
+        assessment = AITestAssessment(
+            test_id=data['test_id'],
+            candidate_id=data['candidate_id'],
+            total_score=data['total_score'],
+            max_score=data['max_score'],
+            score_percentage=data['score_percentage'],
+            recommendation=data['recommendation'],
+            comments=data['comments'],
+            question_scores=json.dumps(data['question_scores']),
+            assessed_by=data['assessed_by']
+        )
+        
+        db.session.add(assessment)
+        
+        # Update test status
+        test = AITestAssignment.query.get(data['test_id'])
+        test.status = 'evaluated'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Assessment submitted successfully',
+            'assessment_id': assessment.id
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@ai_bp.route('/save-test-progress/<test_id>', methods=['POST'])
+@jwt_required()
+def save_test_progress(test_id):
+    """Save candidate's progress during test"""
+    try:
+        data = request.get_json()
+        current_user_id = get_jwt_identity()
+        
+        test = AITestAssignment.query.get_or_404(test_id)
+        
+        # Verify authorization
+        if test.candidate_id != current_user_id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Update answers
+        test.answers = json.dumps(data['answers'])
+        test.status = 'in_progress'
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Progress saved successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+    
+@ai_bp.route('/candidate-tests', methods=['GET'])
+@jwt_required()
+def get_candidate_tests():
+    """Get all technical tests assigned to the current candidate"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Get all tests for this candidate
+        tests = AITestAssignment.query.filter_by(
+            candidate_id=current_user_id
+        ).order_by(AITestAssignment.created_at.desc()).all()
+        
+        result_tests = []
+        for test in tests:
+            test_data = test.to_dict()
+            
+            # Add job title
+            if test.job:
+                test_data['job_title'] = test.job.title
+            
+            # Add assessment if exists
+            assessment = AITestAssessment.query.filter_by(test_id=test.id).first()
+            if assessment:
+                test_data['assessment'] = {
+                    'score_percentage': assessment.score_percentage,
+                    'recommendation': assessment.recommendation,
+                    'comments': assessment.comments
+                }
+            
+            result_tests.append(test_data)
+        
+        return jsonify({
+            'tests': result_tests,
+            'total_count': len(result_tests)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

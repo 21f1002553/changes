@@ -16,7 +16,7 @@ class RAGEngine:
     chunk_size: int = 500
     chunk_overlap: int = 50
     glob: str = '**/*'
-    # separators: str = [" "]
+    separators: str = " "
 
 
 
